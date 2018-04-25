@@ -9,6 +9,8 @@
 
 import UIKit
 import CoreLocation
+import Alamofire
+import SwiftyJSON
 
 class WeatherViewController: UIViewController, CLLocationManagerDelegate {
     
@@ -19,6 +21,7 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate {
 
     //TODO: Declare instance variables here
     let locationManager = CLLocationManager();
+    let weatherDataModel = WeatherDataModel();
 
     
     //Pre-linked IBOutlets
@@ -44,7 +47,19 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate {
     /***************************************************************/
     
     //Write the getWeatherData method here:
-    
+    func getWeatherData(url: String, parameters: [String : String]) {
+        Alamofire.request(url, method: .get, parameters: parameters).responseJSON{
+            response in
+            if response.result.isSuccess {
+                print("Success! Got the weather data")
+                let weatherJson : JSON = JSON(response.result.value!)
+                self.updateWeatherData(json: weatherJson)
+            } else {
+                print("error \(response.result.error)")
+                self.cityLabel.text = "Connection Issues"
+            }
+        }
+    }
 
     
     
@@ -56,7 +71,22 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate {
    
     
     //Write the updateWeatherData method here:
-    
+    func updateWeatherData(json: JSON) {
+        
+        if json["cod"] == 200 {
+            let tempResult = json["main"]["temp"].double
+            let city = json["name"].stringValue
+            let condition = json["weather"][0]["id"].intValue
+            
+            weatherDataModel.temperature = Int(tempResult! - 273.15)
+            weatherDataModel.city = city
+            weatherDataModel.condition = condition
+            weatherDataModel.weatherIconName = weatherDataModel.updateWeatherIcon(condition: condition)
+        } else {
+            cityLabel.text = "Weather Unavailable"
+        }
+        
+    }
 
     
     
@@ -81,6 +111,7 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate {
         let location = locations[locations.count - 1]
         if location.horizontalAccuracy > 0 {
             locationManager.stopUpdatingLocation()
+            locationManager.delegate = nil
             
             print("longitude = \(location.coordinate.longitude), latitude = \(location.coordinate.latitude)")
             
@@ -88,6 +119,8 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate {
             let longitude = String(location.coordinate.longitude)
             
             let params : [String : String] = ["lat" : latitude, "lon" : longitude, "appid" : APP_ID]
+            
+            getWeatherData(url: WEATHER_URL, parameters: params)
         }
     }
     
